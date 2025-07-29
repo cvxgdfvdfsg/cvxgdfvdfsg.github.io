@@ -8,12 +8,24 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     /* Add a unique wrapper to ensure complete isolation */
+ html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    /* Add a unique wrapper to ensure complete isolation */
     .squarespace-flipbook-wrapper {
       all: initial;
       font-family: 'Poppins', sans-serif;
       display: block;
       width: 100%;
+      height: 100vh;
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
     
     .squarespace-flipbook-wrapper * {
@@ -25,7 +37,6 @@
       width: 100%;
       height: 100%;
       display: flex;
-
       font: 1em/1.4 "Poppins", sans-serif;
       overflow: hidden;
       color: hsl(180 68% 5%);
@@ -38,6 +49,7 @@
       -moz-user-select: none;
       -ms-user-select: none;
     }
+
 
     /* Remove focus outline for all interactive elements */
     .flipbook-container:focus,
@@ -71,8 +83,7 @@
     .flipbook-book {
       position: relative;
       display: flex;
-      /* Changed from viewport units to container-relative */
-      width: min(75%, 60vh);
+      width: min(75vw, 60vh);
       aspect-ratio: var(--book-aspect, 0.707); 
       pointer-events: none;
       transform-style: preserve-3d;
@@ -84,7 +95,7 @@
     }
 
     .flipbook-book.landscape {
-      width: min(85%, 70vh);
+      width: min(85vw, 70vh);
     }
 
     .flipbook-book a {
@@ -97,7 +108,7 @@
       display: flex;
       width: 100%;
       height: 100%;
-      font-size: min(2%, 2vh);
+      font-size: min(2vw, 2vh);
       pointer-events: all;
       user-select: none;
       transform-style: preserve-3d;
@@ -106,8 +117,7 @@
         transform 1s,
         rotate 1s ease-in calc((min(var(--i), var(--c)) - max(var(--i), var(--c))) * 50ms);
       translate: calc(var(--i) * -100%) 0px 0px;
-      /* Changed thickness calculation to be more stable */
-      transform: translateZ(calc((var(--c) - var(--i) - 0.5) * calc(var(--thickness) * 0.23em)));
+      transform: translateZ(calc((var(--c) - var(--i) - 0.5) * calc(var(--thickness) * min(0.23vw, 0.23vh))));
       rotate: 0 1 0 calc(clamp(0, var(--c) - var(--i), 1) * -180deg);
       box-shadow: 0em .5em 1em -.2em #8888880a;
       cursor: pointer;
@@ -264,8 +274,8 @@
       }
 
       .flipbook-book {
-        width: min(85%, 70vh);
-        height: min(85vh, 70%);
+        width: min(85vw, 70vh);
+        height: min(85vh, 70vw);
         flex-direction: column;
         rotate: 0deg; /* Remove the 3D tilt on mobile */
         translate: 0% calc(min(var(--c), 1) * -50%);
@@ -276,7 +286,7 @@
         transform-origin: center top;
         translate: 0px calc(var(--i) * -100%) 0px;
         rotate: 1 0 0 calc(clamp(0, var(--c) - var(--i), 1) * 180deg);
-        transform: translateZ(calc((var(--c) - var(--i) - 0.5) * calc(var(--thickness) * 0.23em)));
+        transform: translateZ(calc((var(--c) - var(--i) - 0.5) * calc(var(--thickness) * min(0.23vw, 0.23vh))));
       }
 
       .flipbook-front,
