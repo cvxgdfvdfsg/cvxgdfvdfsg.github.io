@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enhanced FlipBook</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    /* Add a unique wrapper to ensure complete isolation */
+    .squarespace-flipbook-wrapper {
+      all: initial;
+      font-family: 'Poppins', sans-serif;
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .squarespace-flipbook-wrapper * {
+      box-sizing: border-box;
+    }
+
+    .flipbook-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+      display: flex;
+
+      font: 1em/1.4 "Poppins", sans-serif;
+      overflow: hidden;
+      color: hsl(180 68% 5%);
+      border-radius: 8px;
+      container-type: size;
+      /* Prevent focus outline and text selection */
+      outline: none !important;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+
+    /* Remove focus outline for all interactive elements */
+    .flipbook-container:focus,
+    .flipbook-container:focus-visible,
+    .flipbook-container *:focus,
+    .flipbook-container *:focus-visible {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    .flipbook-container * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+
+    /* Update the book container to position correctly */
+    .flipbook-book-container {
+      position: relative;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content; /* Only as wide as needed */
+      max-width: 100%;
+      height: 100%;
+    }
+
+    .flipbook-book {
+      position: relative;
+      display: flex;
+      width: min(75vw, 60vh);
+      aspect-ratio: var(--book-aspect, 0.707); 
+      pointer-events: none;
+      transform-style: preserve-3d;
+      transition: translate 1s;
+      translate: calc(min(var(--c), 1) * 50%) 0%;
+      rotate: 1 0 0 9deg;
+      counter-reset: page -1;
+      user-select: none;
+    }
+
+    .flipbook-book.landscape {
+      width: min(85vw, 70vh);
+    }
+
+    .flipbook-book a {
+      color: inherit;
+    }
+
+    .flipbook-page {
+      --thickness: 4;
+      flex: none;
+      display: flex;
+      width: 100%;
+      height: 100%;
+      font-size: min(2vw, 2vh);
+      pointer-events: all;
+      user-select: none;
+      transform-style: preserve-3d;
+      transform-origin: left center;
+      transition:
+        transform 1s,
+        rotate 1s ease-in calc((min(var(--i), var(--c)) - max(var(--i), var(--c))) * 50ms);
+      translate: calc(var(--i) * -100%) 0px 0px;
+      transform: translateZ(calc((var(--c) - var(--i) - 0.5) * calc(var(--thickness) * min(0.23vw, 0.23vh))));
+      rotate: 0 1 0 calc(clamp(0, var(--c) - var(--i), 1) * -180deg);
+      box-shadow: 0em .5em 1em -.2em #8888880a;
+      cursor: pointer;
+    }
+
+    .flipbook-front,
+    .flipbook-back {
+      position: relative;
+      flex: none;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      overflow: hidden;
+      background-color: #fff;
+      translate: 0px;
+      display: flex;
+      flex-flow: column wrap;
+      justify-content: space-between;
+      padding: 2em;
+      border: 1px solid #0002;
+      user-select: none;
+    }
+
+    .flipbook-front img,
+    .flipbook-back img,
+    .flipbook-front canvas,
+    .flipbook-back canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .flipbook-front:has(img),
+    .flipbook-back:has(img),
+    .flipbook-front:has(canvas),
+    .flipbook-back:has(canvas) {
+      padding: 0;
+    }
+
+    .flipbook-front::after,
+    .flipbook-back::after {
+      position: absolute;
+      bottom: 1em;
+      counter-increment: page;
+      content: counter(page) ".";
+      font-size: 0.8em;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.2em 0.5em;
+      border-radius: 0.3em;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .flipbook-blank::after {
+      content: "";
+    }
+
+    .flipbook-front::after {
+      right: 1em;
+    }
+
+    .flipbook-back::after {
+      left: 1em;
+    }
+
+    .flipbook-front {
+      background: linear-gradient(to left, #f7f7f7 80%, #eee 100%);
+      border-radius: .1em .5em .5em .1em;
+    }
+
+    .flipbook-back {
+      background-image: linear-gradient(to right, #f7f7f7 80%, #eee 100%);
+      border-radius: .5em .1em .1em .5em;
+      translate: -100% 0;
+      rotate: 0 1 0 180deg;
+    }
+
+    .flipbook-nav-arrow {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 45px;
+      font-weight: bold;
+      color: rgba(0, 0, 0, 0.4);
+      transition: all 0.3s ease;
+      pointer-events: all;
+      z-index: 100;
+      user-select: none;
+    }
+
+    .flipbook-nav-arrow:hover {
+      color: rgba(0, 0, 0, 0.8);
+      transform: scale(1.2);
+    }
+
+    .flipbook-nav-arrow.disabled {
+      opacity: 0.3;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+
+    .flipbook-nav-arrow.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.8);
+    }
+
+    /* Desktop positioning (default) */
+    #sq-flipbook-prev-arrow {
+      left: -60px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    #sq-flipbook-next-arrow {
+      right: -60px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    #sq-flipbook-prev-arrow:hover {
+      transform: translateY(-50%) scale(1.2);
+    }
+
+    #sq-flipbook-next-arrow:hover {
+      transform: translateY(-50%) scale(1.2);
+    }
+
+    /* Mobile styles - vertical orientation */
+    @media (max-width: 768px) {
+      .flipbook-container {
+        height: 90vh;
+        flex-direction: column;
+        padding: 0; /* Remove padding, handle arrows differently */
+        justify-content: center;
+        align-items: center;
+      }
+
+      .flipbook-book-container {
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+      }
+
+      .flipbook-book {
+        width: min(85vw, 70vh);
+        height: min(85vh, 70vw);
+        flex-direction: column;
+        rotate: 0deg; /* Remove the 3D tilt on mobile */
+        translate: 0% calc(min(var(--c), 1) * -50%);
+      }
+
+      .flipbook-page {
+        flex-direction: column;
+        transform-origin: center top;
+        translate: 0px calc(var(--i) * -100%) 0px;
+        rotate: 1 0 0 calc(clamp(0, var(--c) - var(--i), 1) * 180deg);
+        transform: translateZ(calc((var(--c) - var(--i) - 0.5) * calc(var(--thickness) * min(0.23vw, 0.23vh))));
+      }
+
+      .flipbook-front,
+      .flipbook-back {
+        width: 100%;
+        height: 100%;
+      }
+
+      .flipbook-back {
+        translate: 0 -100%;
+        rotate: 1 0 0 180deg;
+      }
+
+      /* Vertical arrows for mobile */
+      #sq-flipbook-prev-arrow {
+        left: 50%;
+        top: 20px;
+        transform: translateX(-50%) rotate(90deg);
+      }
+
+      #sq-flipbook-next-arrow {
+        right: auto;
+        left: 50%;
+        top: auto;
+        bottom: 20px;
+        transform: translateX(-50%) rotate(90deg);
+      }
+
+      #sq-flipbook-prev-arrow:hover {
+        transform: translateX(-50%) rotate(90deg) scale(1.2);
+      }
+
+      #sq-flipbook-next-arrow:hover {
+        transform: translateX(-50%) rotate(90deg) scale(1.2);
+      }
+
+      .flipbook-nav-arrow.hidden {
+        transform: translateX(-50%) rotate(90deg) scale(0.8);
+      }
+
+      /* Mobile-specific page styling - higher specificity */
+      /* Mobile-specific page styling - higher specificity */
+      .flipbook-page .flipbook-front {
+        background: linear-gradient(to top, #f7f7f7 80%, #eee 100%) !important;
+        border-radius: .5em .5em .1em .1em !important;
+      }
+
+      .flipbook-page .flipbook-back {
+        background: linear-gradient(to bottom, #f7f7f7 80%, #eee 100%) !important;
+        border-radius: .1em .1em .5em .5em !important;
+      }
+    }
+
+    .flipbook-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2em;
+      color: #666;
+    }
+
+    .flipbook-pdf-loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      flex-direction: column;
+      gap: 20px;
+      border-radius: 8px;
+    }
+
+    .flipbook-loading-circle {
+      width: 120px;
+      height: 120px;
+      border: 4px solid #e0e0e0;
+      border-radius: 50%;
+      position: relative;
+      background: white;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .flipbook-loading-progress {
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: conic-gradient(#007bff 0deg, #007bff var(--progress, 0deg), transparent var(--progress, 0deg));
+      transition: --progress 0.3s ease;
+    }
+
+    .flipbook-loading-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+    }
+
+    .flipbook-loading-status {
+      font-size: 16px;
+      color: #666;
+      text-align: center;
+    }
+
+    /* Prevent any text selection in the entire component */
+    .squarespace-flipbook-wrapper,
+    .squarespace-flipbook-wrapper * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="squarespace-flipbook-wrapper">
+  <div class="flipbook-container" id="sq-flipbook-container">
+    <div class="flipbook-book-container">
+      <div class="flipbook-nav-arrow flipbook-prev-arrow hidden" id="sq-flipbook-prev-arrow">&lt;</div>
+      
+      <div class="flipbook-book" id="sq-flipbook">
+        <!-- PDF pages will be loaded here -->
+      </div>
+      
+      <div class="flipbook-nav-arrow flipbook-next-arrow hidden" id="sq-flipbook-next-arrow">&gt;</div>
+    </div>
+
+    <div class="flipbook-pdf-loading-overlay" id="sq-flipbook-pdf-loading">
+      <div class="flipbook-loading-circle">
+        <div class="flipbook-loading-progress" id="sq-flipbook-loading-progress"></div>
+        <div class="flipbook-loading-text">Laden...</div>
+      </div>
+      <div class="flipbook-loading-status" id="sq-flipbook-loading-status">Downloaden PDF...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+  
+  // Check if we're in Squarespace editor mode
+  if (window.location.href.includes('/config/') || document.body.classList.contains('sqs-edit-mode')) {
+    console.log('Flipbook: Detected Squarespace editor mode, skipping initialization');
+    return;
+  }
+  
+  // Ensure PDF.js is available
+  if (typeof pdfjsLib === 'undefined') {
+    console.error('PDF.js library not loaded');
+    return;
+  }
+  
+  // PDF.js setup with namespace isolation
+  const PDFLib = pdfjsLib;
+  PDFLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  class SquarespaceFlipBook {
+    constructor(container) {
+      this.container = container;
+      this.elBook = container.querySelector('#sq-flipbook');
+      this.currentPage = 0;
+      this.totalPages = 0;
+      this.pages = [];
+      this.pdfDoc = null;
+      this.bufferSize = 8;
+      this.loadedPages = new Set();
+      this.isMobile = this.detectMobile();
+      
+      this.init();
+      this.setupEventListeners();
+    }
+
+    detectMobile() {
+      return window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    init() {
+      this.updatePageCount();
+      this.currentPage = 0;
+      this.elBook.style.setProperty("--c", this.currentPage);
+      this.updateNavigation();
+      this.updatePageIndices();
+      
+      // Automatically load the PDF
+      this.loadPDFFromURL('https://juliahhgg.s3.eu-north-1.amazonaws.com/Gastenboek+Draad+2023-2025-compressed.pdf');
+    }
+
+    updatePageIndices() {
+      this.elBook.querySelectorAll(".flipbook-page").forEach((page, idx) => {
+        page.style.setProperty("--i", idx);
+      });
+    }
+
+    setupEventListeners() {
+      // Scoped to container instead of document
+      const prevArrow = this.container.querySelector('#sq-flipbook-prev-arrow');
+      const nextArrow = this.container.querySelector('#sq-flipbook-next-arrow');
+      
+      if (prevArrow) {
+        prevArrow.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.goToPage(this.currentPage - 1);
+        });
+      }
+
+      if (nextArrow) {
+        nextArrow.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.goToPage(this.currentPage + 1);
+        });
+      }
+
+      // Keyboard navigation scoped to container with improved edge case handling
+      this.container.addEventListener('keydown', (e) => {
+        // Handle both desktop (left/right) and mobile (up/down) navigation
+        const isPrevKey = this.isMobile ? 
+          (e.key === 'ArrowUp' || e.key === 'ArrowLeft') : 
+          (e.key === 'ArrowLeft' || e.key === 'ArrowUp');
+        const isNextKey = this.isMobile ? 
+          (e.key === 'ArrowDown' || e.key === 'ArrowRight') : 
+          (e.key === 'ArrowRight' || e.key === 'ArrowDown');
+
+        if (isPrevKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.currentPage > 0) {
+            this.goToPage(this.currentPage - 1);
+          }
+        } else if (isNextKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.currentPage < this.totalPages - 1) {
+            this.goToPage(this.currentPage + 1);
+          }
+        }
+      });
+
+      // Touch/swipe support for mobile
+      if (this.isMobile) {
+        this.setupTouchEvents();
+      }
+
+      // Prevent context menu and text selection
+      this.container.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+      });
+
+      this.container.addEventListener('selectstart', (e) => {
+        e.preventDefault();
+      });
+
+      this.container.addEventListener('dragstart', (e) => {
+        e.preventDefault();
+      });
+
+      // Handle window resize to update mobile detection
+      window.addEventListener('resize', () => {
+        const wasMobile = this.isMobile;
+        this.isMobile = this.detectMobile();
+        if (wasMobile !== this.isMobile) {
+          this.updateArrowPositions();
+        }
+      });
+
+      // Make container focusable for keyboard events but prevent visible focus
+      this.container.setAttribute('tabindex', '0');
+      this.container.style.outline = 'none';
+    }
+
+    setupTouchEvents() {
+      let startY = 0;
+      let startX = 0;
+      let startTime = 0;
+
+      this.container.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        startY = touch.clientY;
+        startX = touch.clientX;
+        startTime = Date.now();
+      }, { passive: true });
+
+      this.container.addEventListener('touchend', (e) => {
+        if (e.touches.length > 0) return;
+        
+        const touch = e.changedTouches[0];
+        const endY = touch.clientY;
+        const endX = touch.clientX;
+        const endTime = Date.now();
+        
+        const deltaY = startY - endY;
+        const deltaX = startX - endX;
+        const deltaTime = endTime - startTime;
+        
+        // Only trigger if swipe was fast enough and long enough
+        if (deltaTime < 300 && (Math.abs(deltaY) > 50 || Math.abs(deltaX) > 50)) {
+          // Vertical swipes for mobile
+          if (Math.abs(deltaY) > Math.abs(deltaX)) {
+            if (deltaY > 0) { // Swipe up = next page
+              this.goToPage(this.currentPage + 1);
+            } else { // Swipe down = previous page
+              this.goToPage(this.currentPage - 1);
+            }
+          }
+        }
+      }, { passive: true });
+    }
+
+    updatePageCount() {
+      this.totalPages = this.elBook.querySelectorAll(".flipbook-page").length;
+    }
+
+    goToPage(pageNum) {
+      // Strict boundary checking to prevent going beyond valid pages
+      if (pageNum < 0 || pageNum >= this.totalPages) {
+        return false;
+      }
+      
+      this.currentPage = pageNum;
+      this.elBook.style.setProperty("--c", this.currentPage);
+      this.updateNavigation();
+      
+      if (this.pdfDoc) {
+        this.bufferPages();
+      }
+      
+      return true;
+    }
+
+    updateNavigation() {
+      const prevArrow = this.container.querySelector('#sq-flipbook-prev-arrow');
+      const nextArrow = this.container.querySelector('#sq-flipbook-next-arrow');
+      
+      if (!prevArrow || !nextArrow) return;
+      
+      // Remove all visibility classes first
+      prevArrow.classList.remove('hidden', 'disabled');
+      nextArrow.classList.remove('hidden', 'disabled');
+      
+      // Apply appropriate visibility based on current page
+      if (this.currentPage <= 0) {
+        prevArrow.classList.add('hidden');
+      }
+      
+      if (this.currentPage >= this.totalPages - 1) {
+        nextArrow.classList.add('hidden');
+      }
+    }
+
+    async loadPDFFromURL(url) {
+      const loadingOverlay = this.container.querySelector('#sq-flipbook-pdf-loading');
+      const loadingProgress = this.container.querySelector('#sq-flipbook-loading-progress');
+      const loadingStatus = this.container.querySelector('#sq-flipbook-loading-status');
+      
+      if (!loadingOverlay) return;
+      
+      try {
+        loadingOverlay.style.display = 'flex';
+        if (loadingStatus) loadingStatus.textContent = 'Downloading PDF...';
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const contentLength = response.headers.get('content-length');
+        const total = parseInt(contentLength, 10);
+        let loaded = 0;
+        
+        const reader = response.body.getReader();
+        const chunks = [];
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          chunks.push(value);
+          loaded += value.length;
+          
+          if (total && loadingProgress) {
+            const progress = (loaded / total) * 100;
+            const progressDeg = (progress / 100) * 360;
+            loadingProgress.style.setProperty('--progress', `${progressDeg}deg`);
+          }
+        }
+        
+        const arrayBuffer = new Uint8Array(loaded);
+        let position = 0;
+        for (const chunk of chunks) {
+          arrayBuffer.set(chunk, position);
+          position += chunk.length;
+        }
+        
+        if (loadingStatus) loadingStatus.textContent = 'Processing PDF...';
+        
+        this.pdfDoc = await PDFLib.getDocument(arrayBuffer.buffer).promise;
+        
+        this.elBook.innerHTML = '';
+        this.loadedPages.clear();
+
+        if (loadingStatus) loadingStatus.textContent = 'Laden pagina\'s...';
+
+        const firstPage = await this.pdfDoc.getPage(1);
+        const viewport = firstPage.getViewport({ scale: 1 });
+        const aspectRatio = viewport.width / viewport.height;
+        this.elBook.style.setProperty('--book-aspect', aspectRatio);
+        
+        if (viewport.width > viewport.height && !this.isMobile) {
+          this.elBook.classList.add('landscape');
+        } else {
+          this.elBook.classList.remove('landscape');
+        }
+        
+        this.updateArrowPositions();
+
+        const numBookPages = Math.ceil(this.pdfDoc.numPages / 2);
+        for (let i = 0; i < numBookPages; i++) {
+          this.createPDFPageElement(i);
+        }
+
+        this.updatePageCount();
+        this.updatePageIndices();
+        this.currentPage = 30 ;//Math.floor(this.totalPages / 2);
+        this.elBook.style.setProperty("--c", this.currentPage);
+        this.updateNavigation();
+        
+        await this.bufferPages();
+        loadingOverlay.style.display = 'none';
+
+      } catch (error) {
+        console.error('Error loading PDF from URL:', error);
+        if (loadingStatus) {
+          loadingStatus.textContent = 'Error loading PDF. Please refresh to try again.';
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+          }, 3000);
+        }
+      }
+    }
+
+    createPDFPageElement(bookPageNum) {
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'flipbook-page';
+      pageDiv.style.setProperty('--i', bookPageNum);
+      pageDiv.dataset.bookPage = bookPageNum;
+      
+      const frontDiv = document.createElement('div');
+      frontDiv.className = 'flipbook-front';
+      frontDiv.innerHTML = '<div class="flipbook-loading">Loading...</div>';
+      
+      const backDiv = document.createElement('div');
+      backDiv.className = 'flipbook-back';
+      backDiv.innerHTML = '<div class="flipbook-loading">Loading...</div>';
+      
+      pageDiv.appendChild(frontDiv);
+      pageDiv.appendChild(backDiv);
+      
+      pageDiv.addEventListener("click", (evt) => {
+        if (evt.target.closest("a")) return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        
+        const curr = evt.target.closest(".flipbook-back") ? bookPageNum : bookPageNum + 1;
+        this.goToPage(curr);
+      });
+      
+      // Prevent text selection on page elements
+      pageDiv.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+      
+      this.elBook.appendChild(pageDiv);
+    }
+
+    async bufferPages() {
+      if (!this.pdfDoc) return;
+
+      const start = Math.max(0, this.currentPage - this.bufferSize);
+      const end = Math.min(this.totalPages - 1, this.currentPage + this.bufferSize * 2);
+
+      for (let bookPageNum = start; bookPageNum <= end; bookPageNum++) {
+        if (!this.loadedPages.has(bookPageNum)) {
+          await this.renderBookPage(bookPageNum);
+          this.loadedPages.add(bookPageNum);
+        }
+      }
+
+      this.loadedPages.forEach(bookPageNum => {
+        if (bookPageNum < start - this.bufferSize || bookPageNum > end + this.bufferSize) {
+          this.unloadBookPage(bookPageNum);
+          this.loadedPages.delete(bookPageNum);
+        }
+      });
+    }
+
+    async renderBookPage(bookPageNum) {
+      try {
+        const frontPDFPage = bookPageNum * 2 + 1;
+        const backPDFPage = frontPDFPage + 1;
+
+        const pageElement = Array.from(this.elBook.children).find(
+          el => el.dataset.bookPage == bookPageNum
+        );
+        
+        if (!pageElement) return;
+
+        const frontDiv = pageElement.querySelector('.flipbook-front');
+        const backDiv = pageElement.querySelector('.flipbook-back');
+
+        if (frontPDFPage <= this.pdfDoc.numPages) {
+          const frontCanvas = await this.renderPDFPageToCanvas(frontPDFPage);
+          frontDiv.innerHTML = '';
+          frontDiv.appendChild(frontCanvas);
+        } else {
+          frontDiv.innerHTML = '';
+        }
+
+        if (backPDFPage <= this.pdfDoc.numPages) {
+          const backCanvas = await this.renderPDFPageToCanvas(backPDFPage);
+          backDiv.innerHTML = '';
+          backDiv.appendChild(backCanvas);
+        } else {
+          backDiv.innerHTML = '';
+        }
+
+      } catch (error) {
+        console.error(`Error rendering book page ${bookPageNum}:`, error);
+      }
+    }
+
+    async renderPDFPageToCanvas(pdfPageNum) {
+      try {
+        const page = await this.pdfDoc.getPage(pdfPageNum);
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+
+        return canvas;
+      } catch (error) {
+        console.error(`Error rendering PDF page ${pdfPageNum}:`, error);
+        throw error;
+      }
+    }
+
+    updateArrowPositions() {
+      const bookElement = this.elBook;
+      const bookWidth = bookElement.offsetWidth;
+      const bookHeight = bookElement.offsetHeight;
+      const prevArrow = this.container.querySelector('#sq-flipbook-prev-arrow');
+      const nextArrow = this.container.querySelector('#sq-flipbook-next-arrow');
+      
+      if (prevArrow && nextArrow) {
+        if (this.isMobile) {
+          // Vertical positioning for mobile - simple approach
+          prevArrow.style.left = '50%';
+          prevArrow.style.top = '20px';
+          prevArrow.style.right = 'auto';
+          prevArrow.style.bottom = 'auto';
+          
+          nextArrow.style.left = '50%';
+          nextArrow.style.bottom = '20px';
+          nextArrow.style.right = 'auto';
+          nextArrow.style.top = 'auto';
+        } else {
+          // Horizontal positioning for desktop - back to original 0.7
+          prevArrow.style.left = `-${Math.round(bookWidth * 0.70)}px`;
+          prevArrow.style.top = '50%';
+          prevArrow.style.right = 'auto';
+          prevArrow.style.bottom = 'auto';
+          
+          nextArrow.style.right = `-${Math.round(bookWidth * 0.70)}px`;
+          nextArrow.style.top = '50%';
+          nextArrow.style.left = 'auto';
+          nextArrow.style.bottom = 'auto';
+        }
+      }
+    }
+
+    unloadBookPage(bookPageNum) {
+      const pageElement = Array.from(this.elBook.children).find(
+        el => el.dataset.bookPage == bookPageNum
+      );
+      
+      if (pageElement) {
+        const frontDiv = pageElement.querySelector('.flipbook-front');
+        const backDiv = pageElement.querySelector('.flipbook-back');
+        frontDiv.innerHTML = '<div class="flipbook-loading">Loading...</div>';
+        backDiv.innerHTML = '<div class="flipbook-loading">Loading...</div>';
+      }
+    }
+  }
+
+  // Initialize when DOM is ready
+  function initSquarespaceFlipbook() {
+    const container = document.getElementById('sq-flipbook-container');
+    if (container) {
+      new SquarespaceFlipBook(container);
+    }
+  }
+
+  // Use a more robust initialization approach for Squarespace
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSquarespaceFlipbook);
+  } else {
+    // If DOM is already loaded, wait a bit for Squarespace to finish its own initialization
+    setTimeout(initSquarespaceFlipbook, 100);
+  }
+  
+  // Also try initialization on window load as a fallback
+  window.addEventListener('load', function() {
+    if (!document.getElementById('sq-flipbook-container')?.querySelector('.flipbook-book').hasChildNodes()) {
+      setTimeout(initSquarespaceFlipbook, 500);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
